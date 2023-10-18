@@ -1,0 +1,12 @@
+[alias]
+wasm = "build --release --lib --target wasm32-unknown-unknown --locked --workspace --exclude margined-testing"
+wasm-debug = "build --lib --target wasm32-unknown-unknown --locked --workspace --exclude margined-testing"
+unit-test = "test --lib --workspace --exclude margined-protocol --exclude margined-testing --exclude mock-query"
+integration-test = "test --test integration"
+fmt-check = "fmt --all -- --check"
+lint = "clippy -- -D warnings"
+schema = "run schema"
+coverage = "llvm-cov --workspace --lcov --output-path lcov.info"
+
+[target.wasm32-unknown-unknown]
+rustflags = ["-C", "link-arg=-s"]

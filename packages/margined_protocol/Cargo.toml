@@ -1,0 +1,14 @@
+[package]
+authors = [ "Friedrich Grabner <max.grabner@margined.io>" ]
+edition = "2021"
+name    = "margined-protocol"
+version = "0.1.0"
+
+[features]
+# for more explicit tests, cargo test --features=backtraces
+backtraces = [ "cosmwasm-std/backtraces" ]
+
+[dependencies]
+cosmwasm-schema = { workspace = true }
+cosmwasm-std    = { workspace = true }
+thiserror       = { workspace = true }

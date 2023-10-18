@@ -1,0 +1,40 @@
+[package]
+authors = [ "Margined Protocol" ]
+edition = "2021"
+name    = "margined-collector"
+version = "0.1.0"
+
+exclude = [
+ # Those files are rust-optimizer artifacts. You might want to commit them for convenience but they should not be part of the source code publication.
+ "contract.wasm",
+ "hash.txt",
+]
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[lib]
+crate-type = [ "cdylib", "rlib" ]
+
+[features]
+# for more explicit tests, cargo test --features=backtraces
+backtraces = [ "cosmwasm-std/backtraces" ]
+# use library feature to disable all instantiate/execute/query exports
+library = [  ]
+
+[dependencies]
+cosmwasm-schema   = { workspace = true }
+cosmwasm-std      = { workspace = true }
+cw-controllers    = { workspace = true }
+cw-storage-plus   = { workspace = true }
+cw2               = { workspace = true }
+margined-common   = { workspace = true }
+margined-protocol = { workspace = true }
+osmosis-std       = { workspace = true }
+schemars          = { workspace = true }
+serde             = { workspace = true }
+thiserror         = { workspace = true }
+
+[dev-dependencies]
+cosmrs            = { workspace = true }
+margined-testing  = { workspace = true }
+osmosis-test-tube = { workspace = true }

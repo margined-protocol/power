@@ -1,8 +1,9 @@
-use crate::{contract::CONTRACT_NAME, state::Config};
+use crate::contract::CONTRACT_NAME;
 
 use cosmwasm_std::{coins, Decimal, Uint128};
 use margined_protocol::power::{
-    ConfigResponse, ExecuteMsg, QueryMsg, StateResponse, UserVaultsResponse,
+    ConfigResponse, ExecuteMsg, LiquidationAmountResponse, QueryMsg, StateResponse,
+    UserVaultsResponse,
 };
 use margined_testing::power_env::{PowerEnv, BASE_PRICE, SCALED_POWER_PRICE};
 use mock_query::contract::ExecuteMsg as MockQueryExecuteMsg;
@@ -15,9 +16,9 @@ fn test_query() {
 
     let wasm = Wasm::new(&env.app);
 
-    let (perp_address, _) = env.deploy_power(&wasm, CONTRACT_NAME.to_string(), true);
+    let (perp_address, _) = env.deploy_power(&wasm, CONTRACT_NAME.to_string(), false, true);
 
-    let config: Config = wasm.query(&perp_address, &QueryMsg::Config {}).unwrap();
+    let config: ConfigResponse = wasm.query(&perp_address, &QueryMsg::Config {}).unwrap();
 
     // add prices to mock pools
     {
@@ -61,7 +62,7 @@ fn test_query() {
         .unwrap();
     assert_eq!(
         denomalised_mark,
-        Decimal::from_str("909.004045530105750834").unwrap()
+        Decimal::from_str("909.0020226098753148").unwrap()
     );
 
     let denomalised_mark_funding: Decimal = wasm
@@ -78,7 +79,7 @@ fn test_vault_queries() {
     let env = PowerEnv::new();
 
     let wasm = Wasm::new(&env.app);
-    let (perp_address, _) = env.deploy_power(&wasm, CONTRACT_NAME.to_string(), true);
+    let (perp_address, _) = env.deploy_power(&wasm, CONTRACT_NAME.to_string(), false, true);
 
     let config: ConfigResponse = wasm.query(&perp_address, &QueryMsg::Config {}).unwrap();
     let state: StateResponse = wasm.query(&perp_address, &QueryMsg::State {}).unwrap();
@@ -115,9 +116,10 @@ fn test_vault_queries() {
     )
     .unwrap();
 
+    let next_vault_id: u64;
     // check next vault id
     {
-        let next_vault_id: u64 = wasm
+        next_vault_id = wasm
             .query(&perp_address, &QueryMsg::GetNextVaultId {})
             .unwrap();
         assert_eq!(next_vault_id, 1u64);
@@ -197,5 +199,25 @@ fn test_vault_queries() {
             .unwrap();
         let expected_result: Vec<u64> = (6..=10).collect();
         assert_eq!(response.vaults, expected_result);
+    }
+
+    // get liquidation amounts
+    {
+        let response: LiquidationAmountResponse = wasm
+            .query(
+                &perp_address,
+                &QueryMsg::GetLiquidationAmount {
+                    vault_id: next_vault_id,
+                },
+            )
+            .unwrap();
+        assert_eq!(
+            response,
+            LiquidationAmountResponse {
+                liquidation_amount: Uint128::from(1_000_000u128),
+                collateral_to_pay: Uint128::from(1_000_000u128),
+                debt_to_repay: Uint128::from(15_050_000u128),
+            }
+        );
     }
 }

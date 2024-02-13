@@ -1,7 +1,7 @@
-use crate::state::{Config, State};
+use crate::state::State;
 
 use cosmwasm_std::{Addr, Timestamp};
-use margined_protocol::staking::QueryMsg;
+use margined_protocol::staking::{ConfigResponse, QueryMsg};
 use margined_testing::staking_env::StakingEnv;
 use osmosis_test_tube::{Account, Module, Wasm};
 
@@ -17,16 +17,17 @@ fn test_instantiation() {
     let staking_address =
         env.deploy_staking_contract(&wasm, "margined-staking".to_string(), env.signer.address());
 
-    let config: Config = wasm.query(&staking_address, &QueryMsg::Config {}).unwrap();
+    let config: ConfigResponse = wasm.query(&staking_address, &QueryMsg::Config {}).unwrap();
     assert_eq!(
         config,
-        Config {
+        ConfigResponse {
             fee_collector: Addr::unchecked(env.signer.address()),
             deposit_denom: DEPOSIT_DENOM.to_string(),
             deposit_decimals: 6u32,
             reward_denom: REWARD_DENOM.to_string(),
             reward_decimals: 6u32,
             tokens_per_interval: 1_000_000u128.into(),
+            version: "0.1.0".to_string(),
         }
     );
 

@@ -1,4 +1,4 @@
-use crate::helpers::decimal_to_fixed;
+use crate::utils::decimal_to_fixed;
 
 use cosmwasm_std::{Decimal, Uint128};
 

@@ -1,7 +1,7 @@
-use crate::state::{Config, UserStake};
+use crate::state::UserStake;
 
 use cosmwasm_std::{coin, Uint128};
-use margined_protocol::staking::{ExecuteMsg, QueryMsg, UserStakedResponse};
+use margined_protocol::staking::{ConfigResponse, ExecuteMsg, QueryMsg, UserStakedResponse};
 use margined_testing::staking_env::StakingEnv;
 use osmosis_test_tube::{
     osmosis_std::types::cosmos::{bank::v1beta1::MsgSend, base::v1beta1::Coin},
@@ -50,7 +50,7 @@ fn test_stake_unstake_claim() {
         )
         .unwrap();
 
-        let config: Config = wasm.query(&staking_address, &QueryMsg::Config {}).unwrap();
+        let config: ConfigResponse = wasm.query(&staking_address, &QueryMsg::Config {}).unwrap();
         assert_eq!(
             config.tokens_per_interval,
             Uint128::from(new_tokens_per_interval)

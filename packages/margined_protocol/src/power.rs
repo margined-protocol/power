@@ -1,20 +1,24 @@
 use cosmwasm_schema::{cw_serde, QueryResponses};
 use cosmwasm_std::{Addr, Decimal, Timestamp, Uint128};
+use std::fmt;
 
 pub const FUNDING_PERIOD: u64 = 420 * 60 * 60; // 420 hours
 
 #[cw_serde]
 pub struct InstantiateMsg {
-    pub fee_rate: String,        // rate of fees charge, must be less than 1
-    pub fee_pool: String,        // address of fee pool contract
-    pub query_contract: String,  // query contract that wraps native querier
-    pub base_denom: String,      // denom of the underlying token, e.g. atom
-    pub power_denom: String,     // denom of the power token, e.g. atom^2
-    pub base_pool_id: u64,       // id of the pool of the underlying to quote, e.g. atom:usdc
-    pub base_pool_quote: String, // denom of the base pool quote asset, e.g. usdc
-    pub power_pool_id: u64,      // id of the pool of the underlying to power, e.g. atom:atom^2
-    pub base_decimals: u32,      // decimals of the underlying token
-    pub power_decimals: u32,     // decimals of the power perp token
+    pub fee_rate: String,
+    pub fee_pool: String,
+    pub query_contract: String,
+    pub base_denom: String,
+    pub power_denom: String,
+    pub base_pool_id: u64,
+    pub base_pool_quote: String,
+    pub power_pool_id: u64,
+    pub base_decimals: u32,
+    pub power_decimals: u32,
+    pub stake_assets: Option<Vec<StakeAsset>>,
+    pub index_scale: u64,
+    pub min_collateral_amount: String,
 }
 
 #[cw_serde]
@@ -32,6 +36,7 @@ pub enum ExecuteMsg {
     OpenShort {
         amount: Uint128,
         vault_id: Option<u64>,
+        slippage: Option<Decimal>,
     },
     CloseShort {
         amount_to_burn: Uint128,
@@ -49,6 +54,10 @@ pub enum ExecuteMsg {
         max_debt_amount: Uint128,
         vault_id: u64,
     },
+    FlashLiquidate {
+        vault_id: u64,
+        slippage: Option<Decimal>,
+    },
     ApplyFunding {},
     UpdateConfig {
         fee_rate: Option<String>,
@@ -60,7 +69,15 @@ pub enum ExecuteMsg {
         new_owner: String,
         duration: u64,
     },
+    MigrateVaults {
+        start_after: Option<u64>,
+        limit: Option<u64>,
+    },
     RejectOwner {},
+    RemoveEmptyVaults {
+        start_after: Option<u64>,
+        limit: Option<u64>,
+    },
     ClaimOwnership {},
 }
 
@@ -95,6 +112,8 @@ pub enum QueryMsg {
     GetNextVaultId {},
     #[returns(OwnerProposalResponse)]
     GetOwnershipProposal {},
+    #[returns(LiquidationAmountResponse)]
+    GetLiquidationAmount { vault_id: u64 },
     #[returns(bool)]
     CheckVault { vault_id: u64 },
 }
@@ -107,6 +126,8 @@ pub struct VaultResponse {
     pub operator: Addr,
     pub collateral: Uint128,
     pub short_amount: Uint128,
+    pub vault_type: VaultType,
+    pub collateral_ratio: Decimal,
 }
 
 #[cw_serde]
@@ -119,13 +140,22 @@ pub struct ConfigResponse {
     pub query_contract: Addr,
     pub fee_pool_contract: Addr,
     pub fee_rate: Decimal,
-    pub power_denom: String,
-    pub base_denom: String,
+    pub base_asset: Asset,
+    pub power_asset: Asset,
+    pub stake_assets: Option<Vec<StakeAsset>>,
     pub base_pool: Pool,
     pub power_pool: Pool,
     pub funding_period: u64,
-    pub base_decimals: u32,
-    pub power_decimals: u32,
+    pub index_scale: u64,
+    pub min_collateral_amount: Decimal,
+    pub version: String,
+}
+
+#[cw_serde]
+pub struct LiquidationAmountResponse {
+    pub liquidation_amount: Uint128,
+    pub collateral_to_pay: Uint128,
+    pub debt_to_repay: Uint128,
 }
 
 #[cw_serde]
@@ -143,8 +173,40 @@ pub struct OwnerProposalResponse {
     pub expiry: u64,
 }
 
+#[derive(Default)]
 #[cw_serde]
 pub struct Pool {
     pub id: u64,
+    pub base_denom: String,
     pub quote_denom: String,
+}
+
+#[derive(Default)]
+#[cw_serde]
+pub struct Asset {
+    pub denom: String,
+    pub decimals: u32,
+}
+
+#[derive(Default)]
+#[cw_serde]
+pub struct StakeAsset {
+    pub denom: String,
+    pub decimals: u32,
+    pub pool: Pool,
+}
+
+#[cw_serde]
+pub enum VaultType {
+    Default,
+    Staked { denom: String },
+}
+
+impl fmt::Display for VaultType {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            VaultType::Default => write!(f, "Default"),
+            VaultType::Staked { .. } => write!(f, "Staked"),
+        }
+    }
 }

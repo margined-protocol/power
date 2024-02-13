@@ -3,9 +3,10 @@ use cosmwasm_std::{
     Binary, Coin, Decimal, Deps, Event, MessageInfo, StdError, StdResult, SubMsgResponse,
     SubMsgResult, Uint128,
 };
-use osmosis_std::types::{
-    cosmos::bank::v1beta1::BankQuerier, osmosis::poolmanager::v1beta1::PoolmanagerQuerier,
-};
+use osmosis_std::types::osmosis::poolmanager::v1beta1::PoolmanagerQuerier;
+
+pub const WEEK_IN_SECONDS: u64 = 7 * 24 * 60 * 60; // 24 hours
+pub const TWAP_PERIOD: u64 = 420; // 420 seconds (7 minutes)
 
 pub fn parse_funds(funds: Vec<Coin>, expected_denom: String) -> StdResult<Uint128> {
     if funds.is_empty() {
@@ -17,14 +18,6 @@ pub fn parse_funds(funds: Vec<Coin>, expected_denom: String) -> StdResult<Uint12
     }
 
     Ok(funds[0].amount)
-}
-
-pub fn check_denom_metadata(deps: Deps, denom: &str) -> StdResult<()> {
-    let querier = BankQuerier::new(&deps.querier);
-
-    querier.denom_metadata(denom.to_string())?;
-
-    Ok(())
 }
 
 pub fn check_denom_exists_in_pool(deps: Deps, pool_id: u64, denom: &str) -> StdResult<()> {
@@ -92,6 +85,41 @@ pub fn must_pay_two_denoms(
         Err(format!("Missing denom: {}", second_denom))
     } else if info.funds.len() == 1 && info.funds[0].denom == second_denom {
         Err(format!("Missing denom: {}", first_denom))
+    } else if info.funds.len() == 2 {
+        let base = match info.funds.iter().find(|c| c.denom == first_denom) {
+            Some(c) => c,
+            None => return Err(format!("Missing denom: {}", first_denom)),
+        };
+
+        let quote = match info.funds.iter().find(|c| c.denom == second_denom) {
+            Some(c) => c,
+            None => return Err(format!("Missing denom: {}", second_denom)),
+        };
+
+        Ok((base.amount, quote.amount))
+    } else {
+        // find first mis-match
+        let wrong = info
+            .funds
+            .iter()
+            .find(|c| c.denom != first_denom && c.denom != second_denom)
+            .unwrap();
+
+        Err(format!("Extra incorrect denom: {}", wrong.denom))
+    }
+}
+
+pub fn may_pay_two_denoms(
+    info: &MessageInfo,
+    first_denom: &str,
+    second_denom: &str,
+) -> Result<(Uint128, Uint128), String> {
+    if info.funds.is_empty() {
+        Err("No funds sent".to_string())
+    } else if info.funds.len() == 1 && info.funds[0].denom == first_denom {
+        Ok((info.funds[0].amount, Uint128::zero()))
+    } else if info.funds.len() == 1 && info.funds[0].denom == second_denom {
+        Ok((Uint128::zero(), info.funds[0].amount))
     } else if info.funds.len() == 2 {
         let base = match info.funds.iter().find(|c| c.denom == first_denom) {
             Some(c) => c,

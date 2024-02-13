@@ -7,7 +7,7 @@ use cosmrs::proto::{
 use cosmwasm_std::{coin, Addr, Decimal, Uint128};
 use margined_protocol::{
     crab::InstantiateMsg as CrabInstantiateMsg,
-    power::{ExecuteMsg, InstantiateMsg},
+    power::{ExecuteMsg, InstantiateMsg, Pool as PowerPool, StakeAsset},
     query::{InstantiateMsg as QueryInstantiateMsg, QueryMsg as QueryQueryMsg},
 };
 use mock_query::contract::ExecuteMsg as MockQueryExecuteMsg;
@@ -32,9 +32,10 @@ use osmosis_test_tube::{
 use std::{collections::HashMap, str::FromStr};
 
 pub const ONE: u128 = 1_000_000; // 1.0@6dp
-pub const SCALE_FACTOR: u128 = 10_000;
+pub const SCALE_FACTOR: u128 = 10_000; // 1e4
 pub const BASE_PRICE: u128 = 3_000_000_000; // 3000.0@6dp
 pub const POWER_PRICE: u128 = 3_010_000_000; // 3010.0@6dp
+pub const STAKE_PRICE: u128 = 1_100_000; // 1.1@6dp
 pub const SCALED_POWER_PRICE: u128 = 30_100_000; // 0.3010@6dp
 pub const MAX_TWAP_PERIOD: u64 = 48 * 60 * 60;
 pub struct ContractInfo {
@@ -51,6 +52,8 @@ pub struct PowerEnv {
     pub liquidator: SigningAccount,
     pub base_pool_id: u64,
     pub power_pool_id: u64,
+    pub stake_pool_id: u64,
+    pub milk_pool_id: u64,
     pub denoms: HashMap<String, String>,
 }
 
@@ -67,6 +70,8 @@ impl PowerEnv {
         let mut denoms = HashMap::new();
         denoms.insert("quote".to_string(), "usdc".to_string());
         denoms.insert("base".to_string(), "ubase".to_string());
+        denoms.insert("stake".to_string(), "stbase".to_string());
+        denoms.insert("milk".to_string(), "milkbase".to_string());
         denoms.insert("gas".to_string(), "uosmo".to_string());
 
         let signer = app
@@ -74,6 +79,8 @@ impl PowerEnv {
                 coin(1_000_000_000_000_000_000, "uosmo"),
                 coin(1_000_000_000_000_000, "usdc"),
                 coin(1_000_000_000_000_000_000_000_000, "ubase"),
+                coin(1_000_000_000_000_000_000_000_000, "stbase"),
+                coin(1_000_000_000_000_000_000_000_000, "milkbase"),
             ])
             .unwrap();
 
@@ -86,6 +93,8 @@ impl PowerEnv {
                     coin(1_000_000_000_000_000_000, "uosmo"),
                     coin(1_000_000_000_000, "usdc"),
                     coin(1_000_000_000_000_000, "ubase"),
+                    coin(1_000_000_000_000_000, "stbase"),
+                    coin(1_000_000_000_000_000, "milkbase"),
                 ])
                 .unwrap(),
             );
@@ -96,6 +105,8 @@ impl PowerEnv {
                 coin(1_000_000_000_000_000_000, "uosmo"),
                 coin(1_000_000_000_000, "usdc"),
                 coin(1_000_000_000_000_000, "ubase"),
+                coin(1_000_000_000_000_000, "stbase"),
+                coin(1_000_000_000_000_000, "milkbase"),
             ])
             .unwrap();
 
@@ -103,7 +114,7 @@ impl PowerEnv {
             .create_denom(
                 MsgCreateDenom {
                     sender: signer.address(),
-                    subdenom: "squosmo".to_string(),
+                    subdenom: "sqosmo".to_string(),
                 },
                 &signer,
             )
@@ -116,6 +127,8 @@ impl PowerEnv {
             .init_account(&[
                 coin(1_000_000_000_000_000_000, denoms["gas"].clone()),
                 coin(1_000_000_000_000, denoms["base"].clone()),
+                coin(1_000_000_000_000, denoms["stake"].clone()),
+                coin(1_000_000_000_000, denoms["milk"].clone()),
                 coin(3_000_000_000_000, denoms["quote"].clone()),
                 coin(3_000_000_000_000, denoms["power"].clone()),
             ])
@@ -146,6 +159,30 @@ impl PowerEnv {
             .data
             .pool_id;
 
+        let stake_pool_id = gamm
+            .create_basic_pool(
+                &[
+                    coin(900_000_000, denoms["stake"].clone()),
+                    coin(1_000_000_000, denoms["base"].clone()),
+                ],
+                &owner,
+            )
+            .unwrap()
+            .data
+            .pool_id;
+
+        let milk_pool_id = gamm
+            .create_basic_pool(
+                &[
+                    coin(1_100_000_000, denoms["milk"].clone()),
+                    coin(1_000_000_000, denoms["base"].clone()),
+                ],
+                &owner,
+            )
+            .unwrap()
+            .data
+            .pool_id;
+
         // update the parameters so we can have no gas paying token as base
         gov.propose_and_execute(
             "/cosmos.params.v1beta1.ParameterChangeProposal".to_string(),
@@ -153,7 +190,7 @@ impl PowerEnv {
                 title: "Update authorized quote denoms".to_string(),
                 description: "Add ubase as an authorized quote denom".to_string(),
                 changes: vec![ParamChange {
-                    subspace: "concentratedliquidity".to_string(),
+                    subspace: "poolmanager".to_string(),
                     key: "AuthorizedQuoteDenoms".to_string(),
                     value: "[\"usdc\", \"ubase\"]".to_string(),
                 }],
@@ -190,16 +227,14 @@ impl PowerEnv {
         let pool = Pool::decode(pools.pools[0].value.as_slice()).unwrap();
         let power_pool_id = pool.id;
 
-        // LP from 0.2 to 0.65
-        // 1 - (0.000001 * 800000) = 0.2 @-800000
-        // 1 - (0.000001 * 350000) = 0.6 @-350000
+        // Make full range
         concentrated_liquidity
             .create_position(
                 MsgCreatePosition {
                     pool_id: power_pool_id,
                     sender: owner.address(),
-                    lower_tick: -7500000i64,
-                    upper_tick: 750000i64,
+                    lower_tick: -108000000i64,
+                    upper_tick: 342000000i64,
                     tokens_provided: vec![
                         Coin {
                             denom: denoms["power"].clone(),
@@ -226,6 +261,8 @@ impl PowerEnv {
             liquidator,
             base_pool_id,
             power_pool_id,
+            stake_pool_id,
+            milk_pool_id,
             denoms,
         }
     }
@@ -341,7 +378,7 @@ impl PowerEnv {
             )
             .unwrap();
         let (power_address, query_address) =
-            self.deploy_power(wasm, "margined-power".to_string(), is_mock);
+            self.deploy_power(wasm, "margined-power".to_string(), false, is_mock);
 
         if is_mock {
             // Set the oracle price to 300_000 (0.3)
@@ -465,11 +502,37 @@ impl PowerEnv {
         &self,
         wasm: &Wasm<OsmosisTestApp>,
         contract_name: String,
+        use_staked_assets: bool,
         is_mock: bool,
     ) -> (String, String) {
         let token = TokenFactory::new(&self.app);
 
         let query_address = self.deploy_query_contracts(wasm, is_mock);
+
+        let stake_assets = if use_staked_assets {
+            Some(vec![
+                StakeAsset {
+                    denom: self.denoms["stake"].clone(),
+                    pool: PowerPool {
+                        id: self.stake_pool_id,
+                        base_denom: self.denoms["stake"].clone(),
+                        quote_denom: self.denoms["base"].clone(),
+                    },
+                    decimals: 6u32,
+                },
+                StakeAsset {
+                    denom: self.denoms["milk"].clone(),
+                    pool: PowerPool {
+                        id: self.milk_pool_id,
+                        base_denom: self.denoms["milk"].clone(),
+                        quote_denom: self.denoms["base"].clone(),
+                    },
+                    decimals: 6u32,
+                },
+            ])
+        } else {
+            None
+        };
 
         let code_id = store_code(wasm, &self.signer, contract_name);
         let perp_address = wasm
@@ -481,11 +544,14 @@ impl PowerEnv {
                     query_contract: query_address.clone(),
                     power_denom: self.denoms["power"].clone(),
                     base_denom: self.denoms["base"].clone(),
+                    stake_assets,
                     base_pool_id: self.base_pool_id,
                     base_pool_quote: self.denoms["quote"].clone(),
                     power_pool_id: self.power_pool_id,
                     base_decimals: 6u32,
                     power_decimals: 6u32,
+                    index_scale: SCALE_FACTOR as u64,
+                    min_collateral_amount: "0.5".to_string(),
                 },
                 None,
                 Some("margined-power-contract"),

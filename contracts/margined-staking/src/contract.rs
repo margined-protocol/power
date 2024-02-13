@@ -18,7 +18,6 @@ use cosmwasm_std::{
 };
 use cw2::set_contract_version;
 use margined_common::{
-    common::check_denom_metadata,
     errors::ContractError,
     ownership::{
         get_ownership_proposal, handle_claim_ownership, handle_ownership_proposal,
@@ -57,9 +56,6 @@ pub fn instantiate(
             tokens_per_interval: msg.tokens_per_interval,
         },
     )?;
-
-    check_denom_metadata(deps.as_ref(), &msg.deposit_denom)?;
-    check_denom_metadata(deps.as_ref(), &msg.reward_denom)?;
 
     STATE.save(
         deps.storage,

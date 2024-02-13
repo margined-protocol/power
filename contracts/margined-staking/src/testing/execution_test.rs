@@ -1,7 +1,7 @@
-use crate::state::{Config, State, UserStake};
+use crate::state::{State, UserStake};
 
 use cosmwasm_std::{coin, Uint128};
-use margined_protocol::staking::{ExecuteMsg, QueryMsg, UserStakedResponse};
+use margined_protocol::staking::{ConfigResponse, ExecuteMsg, QueryMsg, UserStakedResponse};
 use margined_testing::staking_env::StakingEnv;
 use osmosis_test_tube::{
     osmosis_std::types::cosmos::{bank::v1beta1::MsgSend, base::v1beta1::Coin},
@@ -143,7 +143,7 @@ fn test_update_config() {
 
     let staking_address =
         env.deploy_staking_contract(&wasm, "margined-staking".to_string(), env.signer.address());
-    let config_before: Config = wasm.query(&staking_address, &QueryMsg::Config {}).unwrap();
+    let config_before: ConfigResponse = wasm.query(&staking_address, &QueryMsg::Config {}).unwrap();
 
     // should update config if owner
     {
@@ -157,7 +157,8 @@ fn test_update_config() {
         )
         .unwrap();
 
-        let config_after: Config = wasm.query(&staking_address, &QueryMsg::Config {}).unwrap();
+        let config_after: ConfigResponse =
+            wasm.query(&staking_address, &QueryMsg::Config {}).unwrap();
         assert_eq!(Uint128::from(128u128), config_after.tokens_per_interval);
         assert_ne!(
             config_before.tokens_per_interval,

@@ -2,6 +2,7 @@ mod execute_test;
 mod helpers_test;
 mod instantiation_test;
 mod integration_tests;
+mod migration_test;
 mod ownership_test;
 mod query_test;
 mod test_utils;

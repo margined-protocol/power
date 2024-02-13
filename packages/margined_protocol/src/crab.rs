@@ -83,6 +83,7 @@ pub struct ConfigResponse {
     pub hedging_twap_period: u64,
     pub strategy_cap: Uint128,
     pub strategy_denom: String,
+    pub version: String,
 }
 
 #[derive(Default)]

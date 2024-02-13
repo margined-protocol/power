@@ -74,6 +74,7 @@ pub struct ConfigResponse {
     pub reward_denom: String,
     pub reward_decimals: u32,
     pub tokens_per_interval: Uint128,
+    pub version: String,
 }
 
 #[cw_serde]

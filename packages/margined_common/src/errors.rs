@@ -52,6 +52,15 @@ pub enum ContractError {
     #[error("Insufficient denom {0}. {1} required")]
     InsufficientPower(String, Uint128),
 
+    #[error("Unable to perform migration")]
+    MigrationError {},
+
+    #[error("Must send collateral to new create new vault")]
+    MustSendCollateralToNewVault {},
+
+    #[error("No empty vaults found")]
+    NoEmptyVaults {},
+
     #[error("Non-payable entry point")]
     NonPayable {},
 
@@ -88,6 +97,9 @@ pub enum ContractError {
     #[error("Strategy Cap Exceeded")]
     StrategyCapExceeded {},
 
+    #[error("Stake assets not supported")]
+    StakeAssetsNotSupported {},
+
     #[error("Token denom '{0}' is not supported")]
     TokenUnsupported(String),
 
@@ -100,8 +112,14 @@ pub enum ContractError {
     #[error("Vault is not safe, cannot perform operation")]
     UnsafeVault {},
 
-    #[error("Vault does not exist, cannot perform operation")]
-    VaultDoesNotExist {},
+    #[error("Unprofitable liquidation")]
+    UnprofitableLiquidation {},
+
+    #[error("Vault {0} does not exist, cannot perform operation")]
+    VaultDoesNotExist(u64),
+
+    #[error("Vault Type: expected {0}, got {1} - vault_id: {2}")]
+    VaultTypeDoesNotMatch(String, String, u64),
 
     #[error("Zero mint not supported")]
     ZeroMint {},

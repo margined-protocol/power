@@ -1,10 +1,7 @@
-use crate::{
-    contract::CONTRACT_NAME,
-    state::{Config, State},
-};
+use crate::{contract::CONTRACT_NAME, state::State};
 
 use cosmwasm_std::{coins, Decimal, Uint128};
-use margined_protocol::power::{ExecuteMsg, QueryMsg};
+use margined_protocol::power::{ConfigResponse, ExecuteMsg, QueryMsg};
 use margined_testing::{helpers::parse_event_attribute, power_env::PowerEnv};
 use mock_query::contract::ExecuteMsg as MockQueryExecuteMsg;
 use osmosis_test_tube::{Module, Wasm};
@@ -15,9 +12,9 @@ fn test_funding_actions() {
     let env = PowerEnv::new();
 
     let wasm = Wasm::new(&env.app);
-    let (perp_address, _) = env.deploy_power(&wasm, CONTRACT_NAME.to_string(), true);
+    let (perp_address, _) = env.deploy_power(&wasm, CONTRACT_NAME.to_string(), false, true);
 
-    let config: Config = wasm.query(&perp_address, &QueryMsg::Config {}).unwrap();
+    let config: ConfigResponse = wasm.query(&perp_address, &QueryMsg::Config {}).unwrap();
     let state: State = wasm.query(&perp_address, &QueryMsg::State {}).unwrap();
 
     assert_eq!(Decimal::one(), state.normalisation_factor);
@@ -58,7 +55,7 @@ fn test_funding_actions() {
         {
             let state_before: State = wasm.query(&perp_address, &QueryMsg::State {}).unwrap();
             assert_eq!(
-                Decimal::raw(999_994_436_783_524_723u128),
+                Decimal::raw(999_996_662_200_989_344u128),
                 state_before.normalisation_factor
             );
 
@@ -74,7 +71,7 @@ fn test_funding_actions() {
 
             let state_after: State = wasm.query(&perp_address, &QueryMsg::State {}).unwrap();
 
-            let expected_normalisation_factor: Decimal = Decimal::raw(997_593_962_860_445_984u128);
+            let expected_normalisation_factor: Decimal = Decimal::raw(997_596_182_935_824_294u128);
 
             assert_eq!(
                 expected_normalisation_factor,
@@ -119,7 +116,7 @@ fn test_funding_actions() {
 
             let state_after: State = wasm.query(&perp_address, &QueryMsg::State {}).unwrap();
 
-            let expected_normalisation_factor: Decimal = Decimal::raw(995_199_251_244_479_588u128);
+            let expected_normalisation_factor: Decimal = Decimal::raw(995_201_465_990_595_198u128);
 
             assert_eq!(
                 expected_normalisation_factor,
@@ -164,7 +161,7 @@ fn test_funding_actions() {
 
             let state_after: State = wasm.query(&perp_address, &QueryMsg::State {}).unwrap();
 
-            let expected_normalisation_factor: Decimal = Decimal::raw(992_810_288_103_280_623u128);
+            let expected_normalisation_factor: Decimal = Decimal::raw(992_812_497_532_926_360u128);
             assert_eq!(
                 expected_normalisation_factor,
                 state_after.normalisation_factor
@@ -206,7 +203,7 @@ fn test_funding_actions() {
             .unwrap();
 
             let state: State = wasm.query(&perp_address, &QueryMsg::State {}).unwrap();
-            let expected_normalisation_factor: Decimal = Decimal::raw(992_806_974_302_083_222u128);
+            let expected_normalisation_factor: Decimal = Decimal::raw(992_809_183_724_354_327u128);
 
             assert_eq!(expected_normalisation_factor, state.normalisation_factor);
 
@@ -221,7 +218,7 @@ fn test_funding_actions() {
             .unwrap();
 
             let state: State = wasm.query(&perp_address, &QueryMsg::State {}).unwrap();
-            let expected_normalisation_factor: Decimal = Decimal::raw(992_803_660_511_946_624u128);
+            let expected_normalisation_factor: Decimal = Decimal::raw(992_805_869_926_843_121u128);
 
             assert_eq!(expected_normalisation_factor, state.normalisation_factor);
 
@@ -236,7 +233,7 @@ fn test_funding_actions() {
             .unwrap();
 
             let state: State = wasm.query(&perp_address, &QueryMsg::State {}).unwrap();
-            let expected_normalisation_factor: Decimal = Decimal::raw(992_800_346_732_870_791u128);
+            let expected_normalisation_factor: Decimal = Decimal::raw(992_802_556_140_392_705u128);
 
             assert_eq!(expected_normalisation_factor, state.normalisation_factor);
         }
@@ -287,7 +284,7 @@ fn test_funding_actions() {
         vault_id =
             u64::from_str(&parse_event_attribute(res.events, "wasm-mint", "vault_id")).unwrap();
 
-        let expected_amount_can_mint = Uint128::from(1_345_538u128);
+        let expected_amount_can_mint = Uint128::from(1_345_138u128);
         // should revert if minting too much power after funding
         {
             env.app.increase_time(21600u64); // 6hours
@@ -341,7 +338,7 @@ fn test_funding_actions() {
 
         env.app.increase_time(10795u64); // 3hours
 
-        let max_collateral_to_remove = Uint128::from(717_000u128);
+        let max_collateral_to_remove = Uint128::from(716_900u128);
         // should revert when attempting to withdraw too much collateral
         {
             wasm.execute(
@@ -380,7 +377,7 @@ fn test_funding_actions() {
         {
             let state_before: State = wasm.query(&perp_address, &QueryMsg::State {}).unwrap();
             assert_eq!(
-                Decimal::raw(985_657_792_683_450_661u128),
+                Decimal::raw(985_659_986_195_719_622u128),
                 state_before.normalisation_factor
             );
 
@@ -418,7 +415,7 @@ fn test_funding_actions() {
 
             let state_after: State = wasm.query(&perp_address, &QueryMsg::State {}).unwrap();
 
-            let expected_normalisation_factor: Decimal = Decimal::raw(987_230_796_556_633_421u128);
+            let expected_normalisation_factor: Decimal = Decimal::raw(987_232_993_569_512_148u128);
 
             assert_eq!(
                 expected_normalisation_factor,
@@ -430,7 +427,7 @@ fn test_funding_actions() {
         {
             let state_before: State = wasm.query(&perp_address, &QueryMsg::State {}).unwrap();
             assert_eq!(
-                Decimal::raw(987_230_796_556_633_421u128),
+                Decimal::raw(987_232_993_569_512_148u128),
                 state_before.normalisation_factor
             );
 
@@ -468,7 +465,7 @@ fn test_funding_actions() {
 
             let state_after: State = wasm.query(&perp_address, &QueryMsg::State {}).unwrap();
 
-            let expected_normalisation_factor: Decimal = Decimal::raw(984_859_865_721_874_489u128);
+            let expected_normalisation_factor: Decimal = Decimal::raw(984_862_057_458_412_976u128);
 
             assert_eq!(
                 expected_normalisation_factor,
@@ -512,7 +509,7 @@ fn test_funding_actions() {
 
             let state_after: State = wasm.query(&perp_address, &QueryMsg::State {}).unwrap();
 
-            let expected_normalisation_factor: Decimal = Decimal::raw(966_103_783_878_107_701u128);
+            let expected_normalisation_factor: Decimal = Decimal::raw(966_105_933_874_301_875u128);
 
             assert_eq!(
                 expected_normalisation_factor,
@@ -531,7 +528,7 @@ fn test_funding_actions() {
 
             let state_after: State = wasm.query(&perp_address, &QueryMsg::State {}).unwrap();
 
-            let expected_normalisation_factor: Decimal = Decimal::raw(956_860_653_194_208_855u128);
+            let expected_normalisation_factor: Decimal = Decimal::raw(956_862_782_620_464_142u128);
 
             assert_eq!(
                 expected_normalisation_factor,
@@ -550,7 +547,7 @@ fn test_funding_actions() {
 
             let state_after: State = wasm.query(&perp_address, &QueryMsg::State {}).unwrap();
 
-            let expected_normalisation_factor: Decimal = Decimal::raw(947_705_955_519_542_909u128);
+            let expected_normalisation_factor: Decimal = Decimal::raw(947_708_064_572_660_767u128);
 
             assert_eq!(
                 expected_normalisation_factor,

@@ -1,6 +1,7 @@
 use crate::state::{CONFIG, OWNER, REWARDS_PER_TOKEN, STATE, TOTAL_STAKED, USER_STAKE};
 
 use cosmwasm_std::{Addr, Deps, Env, StdResult, Uint128};
+use cw2::get_contract_version;
 use margined_common::errors::ContractError;
 use margined_protocol::staking::{
     ConfigResponse, StateResponse, TotalStakedResponse, UserStakedResponse,
@@ -17,6 +18,8 @@ pub fn query_owner(deps: Deps) -> Result<Addr, ContractError> {
 pub fn query_config(deps: Deps) -> StdResult<ConfigResponse> {
     let config = CONFIG.load(deps.storage).unwrap();
 
+    let contract = get_contract_version(deps.storage)?;
+
     Ok(ConfigResponse {
         fee_collector: config.fee_collector,
         deposit_denom: config.deposit_denom,
@@ -24,6 +27,7 @@ pub fn query_config(deps: Deps) -> StdResult<ConfigResponse> {
         reward_denom: config.reward_denom,
         reward_decimals: config.reward_decimals,
         tokens_per_interval: config.tokens_per_interval,
+        version: contract.version,
     })
 }
 

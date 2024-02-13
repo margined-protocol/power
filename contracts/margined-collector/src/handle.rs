@@ -1,7 +1,7 @@
 use cosmwasm_std::{
     ensure, BankMsg, Coin, CosmosMsg, Deps, DepsMut, Env, Event, MessageInfo, Response, Uint128,
 };
-use margined_common::{common::check_denom_metadata, errors::ContractError};
+use margined_common::errors::ContractError;
 use osmosis_std::types::cosmos::bank::v1beta1::BankQuerier;
 use std::str::FromStr;
 
@@ -18,9 +18,6 @@ pub fn add_token(
         OWNER.is_admin(deps.as_ref(), &info.sender)?,
         ContractError::Unauthorized {}
     );
-
-    check_denom_metadata(deps.as_ref(), &token)
-        .map_err(|_| ContractError::InvalidDenom(token.clone()))?;
 
     save_token(deps, token.clone())?;
 

@@ -1,6 +1,7 @@
 use crate::{
-    helpers::{calculate_denormalized_mark, calculate_index, wrapped_pow},
+    helpers::{calculate_denormalized_mark, calculate_index},
     state::STATE,
+    utils::wrapped_pow,
 };
 
 use cosmwasm_std::{Decimal, Deps, DepsMut, Env, StdResult};

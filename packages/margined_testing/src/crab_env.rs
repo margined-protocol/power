@@ -3,6 +3,7 @@ use crate::helpers::store_code;
 use cosmwasm_std::{coin, Addr, Decimal, Uint128};
 use margined_protocol::crab::InstantiateMsg;
 use osmosis_test_tube::{OsmosisTestApp, SigningAccount, Wasm};
+
 pub const MOCK_POWER_ADDR: &str = "osmo1cnj84q49sp4sd3tsacdw9p4zvyd8y46f2248ndq2edve3fqa8krs9jds9g";
 pub const MOCK_QUERY_ADDR: &str = "osmo1cnj84q49sp4sd3tsacdw9p4zvyd8y46f2248ndq2edve3fqa8krs9jds9g";
 pub const MOCK_FEE_POOL_CONTRACT: &str = "osmo1tj5a2z96vfy8av78926pgs3x774dvhzgxayue0";

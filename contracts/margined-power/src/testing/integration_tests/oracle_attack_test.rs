@@ -25,12 +25,14 @@ fn test_scenario_base_price_spikes_100_percent() {
     let wasm = Wasm::new(&env.app);
     let pool_manager = PoolManager::new(&env.app);
 
-    let (perp_address, _) = env.deploy_power(&wasm, CONTRACT_NAME.to_string(), false);
+    let (perp_address, _) = env.deploy_power(&wasm, CONTRACT_NAME.to_string(), false, false);
 
     let vault_id: u64;
 
     // prepare the vault with collateral ratio 2x
     {
+        env.app.increase_time(1u64);
+
         let mint_response = wasm
             .execute(
                 &perp_address,
@@ -197,12 +199,14 @@ fn test_scenario_base_price_crashes_50_percent() {
     let wasm = Wasm::new(&env.app);
     let pool_manager = PoolManager::new(&env.app);
 
-    let (perp_address, _) = env.deploy_power(&wasm, CONTRACT_NAME.to_string(), false);
+    let (perp_address, _) = env.deploy_power(&wasm, CONTRACT_NAME.to_string(), false, false);
 
     let vault_id: u64;
 
     // prepare the vault with collateral ratio 2x
     {
+        env.app.increase_time(1u64);
+
         let mint_response = wasm
             .execute(
                 &perp_address,

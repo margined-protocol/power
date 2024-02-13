@@ -2,7 +2,10 @@ use crate::{contract::CONTRACT_NAME, state::State, testing::test_utils::MOCK_FEE
 
 use cosmwasm_std::{coin, Decimal, Uint128};
 use margined_protocol::power::{ExecuteMsg, InstantiateMsg, QueryMsg};
-use margined_testing::{helpers::store_code, power_env::PowerEnv};
+use margined_testing::{
+    helpers::store_code,
+    power_env::{PowerEnv, SCALE_FACTOR},
+};
 use osmosis_test_tube::{
     osmosis_std::types::osmosis::tokenfactory::v1beta1::MsgChangeAdmin, Account, Module,
     RunnerError, TokenFactory, Wasm,
@@ -27,11 +30,14 @@ fn test_permissions() {
                 query_contract: query_address,
                 power_denom: env.denoms["power"].clone(),
                 base_denom: env.denoms["base"].clone(),
+                stake_assets: None,
                 base_pool_id: env.base_pool_id,
                 base_pool_quote: env.denoms["quote"].clone(),
                 power_pool_id: env.power_pool_id,
                 base_decimals: 6u32,
                 power_decimals: 6u32,
+                index_scale: SCALE_FACTOR as u64,
+                min_collateral_amount: "0.5".to_string(),
             },
             None,
             Some("margined-power-contract"),
@@ -42,7 +48,7 @@ fn test_permissions() {
         .data
         .address;
 
-    let timestamp = env.app.get_block_timestamp();
+    let mut timestamp = env.app.get_block_timestamp();
 
     let state: State = wasm.query(&address, &QueryMsg::State {}).unwrap();
     assert_eq!(
@@ -215,6 +221,8 @@ fn test_permissions() {
 
         wasm.execute(&address, &ExecuteMsg::SetOpen {}, &[], &env.signer)
             .unwrap();
+
+        timestamp = env.app.get_block_timestamp();
 
         let state: State = wasm.query(&address, &QueryMsg::State {}).unwrap();
         assert_eq!(
@@ -400,11 +408,14 @@ fn test_pause_unpause() {
                 query_contract: query_address,
                 power_denom: env.denoms["power"].clone(),
                 base_denom: env.denoms["base"].clone(),
+                stake_assets: None,
                 base_pool_id: env.base_pool_id,
                 base_pool_quote: env.denoms["quote"].clone(),
                 power_pool_id: env.power_pool_id,
                 base_decimals: 6u32,
                 power_decimals: 6u32,
+                index_scale: SCALE_FACTOR as u64,
+                min_collateral_amount: "0.5".to_string(),
             },
             None,
             Some("margined-power-contract"),
@@ -415,7 +426,7 @@ fn test_pause_unpause() {
         .data
         .address;
 
-    let timestamp = env.app.get_block_timestamp();
+    let mut timestamp = env.app.get_block_timestamp();
 
     let state: State = wasm.query(&address, &QueryMsg::State {}).unwrap();
     assert_eq!(
@@ -473,6 +484,8 @@ fn test_pause_unpause() {
 
         wasm.execute(&address, &ExecuteMsg::SetOpen {}, &[], &env.signer)
             .unwrap();
+
+        timestamp = env.app.get_block_timestamp();
 
         let state: State = wasm.query(&address, &QueryMsg::State {}).unwrap();
         assert_eq!(

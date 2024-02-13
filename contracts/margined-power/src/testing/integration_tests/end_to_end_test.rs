@@ -1,18 +1,21 @@
-use crate::{contract::CONTRACT_NAME, vault::Vault};
+use crate::contract::{CONTRACT_NAME, CONTRACT_VERSION};
 
 use cosmwasm_std::{coin, Addr, Decimal, Uint128};
 use margined_protocol::power::{
-    ConfigResponse, ExecuteMsg, Pool, QueryMsg, StateResponse, VaultResponse,
+    Asset, ConfigResponse, ExecuteMsg, Pool, QueryMsg, StateResponse, VaultResponse,
 };
-use margined_testing::{helpers::parse_event_attribute, power_env::PowerEnv};
+use margined_testing::{
+    helpers::parse_event_attribute,
+    power_env::{PowerEnv, SCALE_FACTOR},
+};
 use osmosis_test_tube::{
     osmosis_std::types::{
         cosmos::bank::v1beta1::MsgSend,
         cosmos::base::v1beta1::Coin,
         osmosis::concentratedliquidity::v1beta1 as CLTypes,
         osmosis::poolmanager::v1beta1::{
-            MsgSwapExactAmountIn, MsgSwapExactAmountOut, SpotPriceRequest, SwapAmountInRoute,
-            SwapAmountOutRoute, TotalPoolLiquidityRequest,
+            MsgSwapExactAmountIn, MsgSwapExactAmountOut, SwapAmountInRoute, SwapAmountOutRoute,
+            TotalPoolLiquidityRequest,
         },
     },
     Account, Bank, ConcentratedLiquidity, Module, PoolManager, Wasm,
@@ -34,7 +37,8 @@ fn test_end_to_end_flow() {
     let wasm = Wasm::new(&env.app);
     let pool_manager = PoolManager::new(&env.app);
 
-    let (perp_address, query_address) = env.deploy_power(&wasm, CONTRACT_NAME.to_string(), false);
+    let (perp_address, query_address) =
+        env.deploy_power(&wasm, CONTRACT_NAME.to_string(), false, false);
 
     let vault_id_short: u64;
 
@@ -133,15 +137,6 @@ fn test_end_to_end_flow() {
                 &env.owner,
             )
             .unwrap();
-
-        let res = pool_manager
-            .query_spot_price(&SpotPriceRequest {
-                pool_id: env.power_pool_id,
-                base_asset_denom: env.denoms["base"].clone(),
-                quote_asset_denom: env.denoms["power"].clone(),
-            })
-            .unwrap();
-        println!("res: {:#?}", res);
     }
 
     // we increase time else the functions get unhappy
@@ -228,11 +223,6 @@ fn test_end_to_end_flow() {
         assert!(res);
     }
 
-    let norm: Decimal = wasm
-        .query(&perp_address, &QueryMsg::GetNormalisationFactor {})
-        .unwrap();
-    println!("norm: {:#?}", norm);
-
     // user withdraws some collateral - success as vault remains safe
     {
         wasm.execute(
@@ -318,7 +308,9 @@ fn test_end_to_end_flow() {
             },
         )
         .unwrap();
-    assert_eq!(vault_initial, vault_after);
+    assert_eq!(vault_initial.operator, vault_after.operator);
+    assert_eq!(vault_initial.collateral, vault_after.collateral);
+    assert_eq!(vault_initial.short_amount, vault_after.short_amount);
 
     // user sells the power token
     {
@@ -411,15 +403,6 @@ fn test_end_to_end_flow() {
             )
             .unwrap();
 
-        let res = pool_manager
-            .query_spot_price(&SpotPriceRequest {
-                pool_id: env.base_pool_id,
-                base_asset_denom: env.denoms["base"].clone(),
-                quote_asset_denom: env.denoms["quote"].clone(),
-            })
-            .unwrap();
-        println!("res base: {:#?}", res);
-
         // increase time to affect the TWAP
         env.app.increase_time(3600u64);
 
@@ -436,7 +419,7 @@ fn test_end_to_end_flow() {
 
     // liquidate the short vault
     {
-        let vault_before: Vault = wasm
+        let vault_before: VaultResponse = wasm
             .query(
                 &perp_address,
                 &QueryMsg::GetVault {
@@ -460,7 +443,6 @@ fn test_end_to_end_flow() {
         .unwrap();
 
         let balance = env.get_balance(env.traders[2].address(), env.denoms["power"].clone());
-        println!("balance: {:#?}", balance);
         assert_eq!(balance, amount_to_send);
 
         wasm.execute(
@@ -480,7 +462,7 @@ fn test_end_to_end_flow() {
 
     // short trader closes vault
     {
-        let vault: Vault = wasm
+        let vault: VaultResponse = wasm
             .query(
                 &perp_address,
                 &QueryMsg::GetVault {
@@ -580,19 +562,29 @@ fn test_end_to_end_flow() {
                 fee_rate: Decimal::percent(1u64),
                 fee_pool_contract: Addr::unchecked(env.fee_pool.address()),
                 query_contract: Addr::unchecked(query_address),
-                power_denom: env.denoms["power"].clone(),
-                base_denom: env.denoms["base"].clone(),
+                base_asset: Asset {
+                    denom: env.denoms["base"].clone(),
+                    decimals: 6u32,
+                },
+                power_asset: Asset {
+                    denom: env.denoms["power"].clone(),
+                    decimals: 6u32,
+                },
+                stake_assets: None,
                 base_pool: Pool {
                     id: env.base_pool_id,
+                    base_denom: env.denoms["base"].clone(),
                     quote_denom: env.denoms["quote"].clone()
                 },
                 power_pool: Pool {
                     id: env.power_pool_id,
+                    base_denom: env.denoms["base"].clone(),
                     quote_denom: env.denoms["power"].clone()
                 },
                 funding_period: 1512000u64,
-                base_decimals: 6u32,
-                power_decimals: 6u32,
+                index_scale: SCALE_FACTOR as u64,
+                min_collateral_amount: Decimal::from_str("0.5").unwrap(),
+                version: CONTRACT_VERSION.to_string(),
             }
         );
     }

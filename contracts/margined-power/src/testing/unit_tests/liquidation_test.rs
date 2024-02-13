@@ -1,11 +1,7 @@
-use crate::{
-    contract::CONTRACT_NAME,
-    state::{Config, State},
-    vault::Vault,
-};
+use crate::{contract::CONTRACT_NAME, state::State};
 
 use cosmwasm_std::{coin, Decimal, Uint128};
-use margined_protocol::power::{ExecuteMsg, QueryMsg};
+use margined_protocol::power::{ConfigResponse, ExecuteMsg, QueryMsg, VaultResponse};
 use margined_testing::{
     helpers::parse_event_attribute,
     power_env::{PowerEnv, BASE_PRICE, ONE, SCALE_FACTOR},
@@ -25,9 +21,9 @@ fn test_liquidation_profitable() {
 
     let wasm = Wasm::new(&env.app);
     let bank = Bank::new(&env.app);
-    let (perp_address, _) = env.deploy_power(&wasm, CONTRACT_NAME.to_string(), true);
+    let (perp_address, _) = env.deploy_power(&wasm, CONTRACT_NAME.to_string(), false, true);
 
-    let config: Config = wasm.query(&perp_address, &QueryMsg::Config {}).unwrap();
+    let config: ConfigResponse = wasm.query(&perp_address, &QueryMsg::Config {}).unwrap();
     let state: State = wasm.query(&perp_address, &QueryMsg::State {}).unwrap();
 
     assert_eq!(Decimal::one(), state.normalisation_factor);
@@ -104,7 +100,7 @@ fn test_liquidation_profitable() {
             .unwrap()
             .amount;
 
-        let vault_after: Vault = wasm
+        let vault_after: VaultResponse = wasm
             .query(
                 &perp_address,
                 &QueryMsg::GetVault {
@@ -114,10 +110,10 @@ fn test_liquidation_profitable() {
             .unwrap();
 
         assert_eq!(
-            100_000_600u128 + u128::from_str(&power_balance_before).unwrap(),
+            100_000_400u128 + u128::from_str(&power_balance_before).unwrap(),
             u128::from_str(&power_balance_after).unwrap()
         );
-        assert_eq!(Uint128::from(100_000_600u128), vault_after.short_amount);
+        assert_eq!(Uint128::from(100_000_400u128), vault_after.short_amount);
     }
 
     // open vault id 2
@@ -156,7 +152,7 @@ fn test_liquidation_profitable() {
             .unwrap()
             .amount;
 
-        let vault_after: Vault = wasm
+        let vault_after: VaultResponse = wasm
             .query(
                 &perp_address,
                 &QueryMsg::GetVault {
@@ -165,8 +161,8 @@ fn test_liquidation_profitable() {
             )
             .unwrap();
 
-        assert_eq!(2_000_014u128, u128::from_str(&power_balance_after).unwrap());
-        assert_eq!(Uint128::from(2_000_014u128), vault_after.short_amount);
+        assert_eq!(2_000_010u128, u128::from_str(&power_balance_after).unwrap());
+        assert_eq!(Uint128::from(2_000_010u128), vault_after.short_amount);
     }
 
     // should revert liquidating vault id 0
@@ -185,7 +181,7 @@ fn test_liquidation_profitable() {
         assert_eq!(
             liquidate_response.unwrap_err(),
             RunnerError::ExecuteError {
-                msg: "failed to execute message; message index: 0: Vault does not exist, cannot perform operation: execute wasm contract failed".to_string()
+                msg: "failed to execute message; message index: 0: Vault 0 does not exist, cannot perform operation: execute wasm contract failed".to_string()
             }
         );
     }
@@ -206,14 +202,14 @@ fn test_liquidation_profitable() {
         assert_eq!(
             liquidate_response.unwrap_err(),
             RunnerError::ExecuteError {
-                msg: "failed to execute message; message index: 0: Vault does not exist, cannot perform operation: execute wasm contract failed".to_string()
+                msg: "failed to execute message; message index: 0: Vault 10 does not exist, cannot perform operation: execute wasm contract failed".to_string()
             }
         );
     }
 
     // should revert liquidating a safu vault
     {
-        let vault_before: Vault = wasm
+        let vault_before: VaultResponse = wasm
             .query(
                 &perp_address,
                 &QueryMsg::GetVault {
@@ -268,14 +264,14 @@ fn test_liquidation_profitable() {
         .unwrap();
     }
 
-    // should revert if the vault becomes dust after liqudiation
+    // should revert if the vault becomes dust after liquidation
     {
         // TODO: we don't have the concept of dust, (yet)
     }
 
     // should allow liquidation a whole vault if only liquidating half will make it a dust vault
     {
-        let vault_before: Vault = wasm
+        let vault_before: VaultResponse = wasm
             .query(
                 &perp_address,
                 &QueryMsg::GetVault {
@@ -303,7 +299,7 @@ fn test_liquidation_profitable() {
             "collateral_to_pay",
         ))
         .unwrap();
-        assert_eq!(Uint128::from(888_806u128), collateral_to_pay);
+        assert_eq!(Uint128::from(888_804u128), collateral_to_pay);
 
         let liquidation_amount = Uint128::from_str(&parse_event_attribute(
             liquidate_response.events,
@@ -311,9 +307,9 @@ fn test_liquidation_profitable() {
             "liquidation_amount",
         ))
         .unwrap();
-        assert_eq!(Uint128::from(2_000_014u128), liquidation_amount);
+        assert_eq!(Uint128::from(2_000_010u128), liquidation_amount);
 
-        let vault_after: Vault = wasm
+        let vault_after: VaultResponse = wasm
             .query(
                 &perp_address,
                 &QueryMsg::GetVault {
@@ -323,7 +319,7 @@ fn test_liquidation_profitable() {
             .unwrap();
 
         assert_eq!(Uint128::zero(), vault_after.short_amount);
-        assert_eq!(Uint128::from(11_194u128), vault_after.collateral);
+        assert_eq!(Uint128::from(11_196u128), vault_after.collateral);
     }
 
     // liquidate unsafe vault (vault id 1)
@@ -342,7 +338,7 @@ fn test_liquidation_profitable() {
         )
         .unwrap();
 
-        let vault_before: Vault = wasm
+        let vault_before: VaultResponse = wasm
             .query(
                 &perp_address,
                 &QueryMsg::GetVault {
@@ -370,7 +366,7 @@ fn test_liquidation_profitable() {
             "collateral_to_pay",
         ))
         .unwrap();
-        assert_eq!(Uint128::from(22_220_133u128), collateral_to_pay);
+        assert_eq!(Uint128::from(22_220_088u128), collateral_to_pay);
 
         let liquidation_amount = Uint128::from_str(&parse_event_attribute(
             liquidate_response.events,
@@ -378,7 +374,7 @@ fn test_liquidation_profitable() {
             "liquidation_amount",
         ))
         .unwrap();
-        assert_eq!(Uint128::from(50_000_300u128), liquidation_amount);
+        assert_eq!(Uint128::from(50_000_200u128), liquidation_amount);
 
         let liquidator_power_after = Uint128::from_str(
             &bank
@@ -393,7 +389,7 @@ fn test_liquidation_profitable() {
         )
         .unwrap();
 
-        let vault_after: Vault = wasm
+        let vault_after: VaultResponse = wasm
             .query(
                 &perp_address,
                 &QueryMsg::GetVault {
@@ -402,12 +398,8 @@ fn test_liquidation_profitable() {
             )
             .unwrap();
 
-        assert_eq!(Uint128::from(50_000_300u128), vault_after.short_amount);
-        assert_eq!(Uint128::from(22_779_916u128), vault_after.collateral);
-        // assert_eq!(
-        //     liquidator_base_before + collateral_to_pay,
-        //     liquidator_base_after
-        // );
+        assert_eq!(Uint128::from(50_000_200u128), vault_after.short_amount);
+        assert_eq!(Uint128::from(22_779_961u128), vault_after.collateral);
         assert_eq!(
             liquidator_power_after + max_debt_amount,
             liquidator_power_before
@@ -423,9 +415,9 @@ fn test_liquidation_unprofitable() {
 
     let wasm = Wasm::new(&env.app);
     let bank = Bank::new(&env.app);
-    let (perp_address, _) = env.deploy_power(&wasm, CONTRACT_NAME.to_string(), true);
+    let (perp_address, _) = env.deploy_power(&wasm, CONTRACT_NAME.to_string(), false, true);
 
-    let config: Config = wasm.query(&perp_address, &QueryMsg::Config {}).unwrap();
+    let config: ConfigResponse = wasm.query(&perp_address, &QueryMsg::Config {}).unwrap();
     let state: State = wasm.query(&perp_address, &QueryMsg::State {}).unwrap();
 
     assert_eq!(Decimal::one(), state.normalisation_factor);
@@ -513,7 +505,7 @@ fn test_liquidation_unprofitable() {
     // should revert if vault is paying out all collateral, but there is debt remaining
     {
         env.app.increase_time(1u64);
-        let vault: Vault = wasm
+        let vault: VaultResponse = wasm
             .query(
                 &perp_address,
                 &QueryMsg::GetVault {
@@ -538,7 +530,7 @@ fn test_liquidation_unprofitable() {
     // can fully liquidate an underwater vault even if it is not profitable
     {
         env.app.increase_time(1u64);
-        let vault: Vault = wasm
+        let vault: VaultResponse = wasm
             .query(
                 &perp_address,
                 &QueryMsg::GetVault {
@@ -600,7 +592,7 @@ fn test_liquidation_unprofitable() {
             "liquidation_amount",
         ))
         .unwrap();
-        assert_eq!(Uint128::from(100_000_600u128), liquidation_amount);
+        assert_eq!(Uint128::from(100_000_400u128), liquidation_amount);
 
         let liquidator_base_after = Uint128::from_str(
             &bank
@@ -627,7 +619,7 @@ fn test_liquidation_unprofitable() {
         )
         .unwrap();
 
-        let vault_after: Vault = wasm
+        let vault_after: VaultResponse = wasm
             .query(
                 &perp_address,
                 &QueryMsg::GetVault {

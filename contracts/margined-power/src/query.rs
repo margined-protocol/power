@@ -1,15 +1,18 @@
 use crate::{
     funding::calculate_normalisation_factor,
-    helpers::calculate_denormalized_mark,
+    helpers::{calculate_denormalized_mark, get_liquidation_results},
     queries::{get_pool_twap, get_scaled_pool_twap},
     state::{CONFIG, OWNER, STATE},
-    vault::{is_vault_safe, VAULTS, VAULTS_COUNTER},
+    vault::{check_vault, is_vault_safe, Vault, VAULTS, VAULTS_COUNTER},
 };
 
 use cosmwasm_std::{Addr, Decimal, Deps, Env, Order, StdError, StdResult, Timestamp};
+use cw2::get_contract_version;
 use cw_storage_plus::Bound;
 use margined_common::errors::ContractError;
-use margined_protocol::power::{ConfigResponse, StateResponse, UserVaultsResponse, VaultResponse};
+use margined_protocol::power::{
+    ConfigResponse, LiquidationAmountResponse, StateResponse, UserVaultsResponse, VaultResponse,
+};
 
 const DEFAULT_LIMIT: u32 = 10;
 const MAX_LIMIT: u32 = 50;
@@ -21,17 +24,21 @@ fn calculate_start_time(env: Env, period: u64) -> Timestamp {
 pub fn query_config(deps: Deps) -> StdResult<ConfigResponse> {
     let config = CONFIG.load(deps.storage).unwrap();
 
+    let contract = get_contract_version(deps.storage)?;
+
     Ok(ConfigResponse {
         query_contract: config.query_contract,
         fee_pool_contract: config.fee_pool_contract,
         fee_rate: config.fee_rate,
-        power_denom: config.power_denom,
-        base_denom: config.base_denom,
+        base_asset: config.base_asset,
+        power_asset: config.power_asset,
+        stake_assets: config.stake_assets,
         base_pool: config.base_pool,
         power_pool: config.power_pool,
         funding_period: config.funding_period,
-        base_decimals: config.base_decimals,
-        power_decimals: config.power_decimals,
+        index_scale: config.index_scale,
+        min_collateral_amount: config.min_collateral_amount,
+        version: contract.version,
     })
 }
 
@@ -69,7 +76,7 @@ pub fn get_index(deps: Deps, env: Env, period: u64) -> StdResult<Decimal> {
     let quote_price = get_scaled_pool_twap(
         &deps,
         config.base_pool.id,
-        config.base_denom.clone(),
+        config.base_asset.denom.clone(),
         config.base_pool.quote_denom,
         start_time,
     )
@@ -88,7 +95,7 @@ pub fn get_unscaled_index(deps: Deps, env: Env, period: u64) -> StdResult<Decima
     let quote_price = get_pool_twap(
         &deps,
         config.base_pool.id,
-        config.base_denom.clone(),
+        config.base_asset.denom.clone(),
         config.base_pool.quote_denom,
         start_time,
     )
@@ -129,13 +136,21 @@ pub fn get_check_vault(deps: Deps, env: Env, vault_id: u64) -> StdResult<bool> {
     Ok(result)
 }
 
-pub fn get_vault(deps: Deps, vault_id: u64) -> StdResult<VaultResponse> {
-    let vault = VAULTS.may_load(deps.storage, &vault_id)?;
+pub fn get_vault(deps: Deps, env: Env, vault_id: u64) -> StdResult<VaultResponse> {
+    let vault = VAULTS.may_load(deps.storage, vault_id)?;
     if let Some(vault) = vault {
+        let config = CONFIG.load(deps.storage).unwrap();
+        let normalisation_factor = calculate_normalisation_factor(deps, env.clone())?;
+
+        let (_, _, collateral_ratio) =
+            check_vault(deps, config, vault_id, normalisation_factor, env.block.time).unwrap();
+
         Ok(VaultResponse {
             operator: vault.operator,
             collateral: vault.collateral,
             short_amount: vault.short_amount,
+            vault_type: vault.vault_type,
+            collateral_ratio,
         })
     } else {
         Err(StdError::generic_err("Vault not found"))
@@ -167,4 +182,30 @@ pub fn get_user_vaults(
         .collect::<StdResult<Vec<_>>>()?;
 
     Ok(UserVaultsResponse { vaults })
+}
+
+pub fn get_liquidation_amount(
+    deps: Deps,
+    env: Env,
+    vault_id: u64,
+) -> StdResult<LiquidationAmountResponse> {
+    let vault = get_vault(deps, env.clone(), vault_id)?;
+
+    let (liquidation_amount, collateral_to_pay, debt_to_repay) = get_liquidation_results(
+        deps,
+        env,
+        vault.short_amount,
+        Vault {
+            operator: vault.operator,
+            collateral: vault.collateral,
+            short_amount: vault.short_amount,
+            vault_type: vault.vault_type,
+        },
+    );
+
+    Ok(LiquidationAmountResponse {
+        liquidation_amount,
+        collateral_to_pay,
+        debt_to_repay,
+    })
 }
